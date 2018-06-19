@@ -1,0 +1,45 @@
+package com.xing.test.publish;
+
+import com.rabbitmq.client.*;
+import com.xing.test.model.ConnectionUtils;
+
+import java.io.IOException;
+
+/**
+ * @author wang xing
+ * @date 2018/6/4 下午3:10
+ */
+public class Recv1publish {
+    private final static String QUEUE_NAME = "test_queue_fanout_email";
+    private final static String EXCHANGE_NAME = "test_exchange_fanout";
+    public static void main(String[] argv) throws Exception {
+        Connection connection = ConnectionUtils.getConnection(); /*从连接中创建通道*/
+        Channel channel = connection.createChannel();
+
+        //TODO 声明队列 如果能确定是哪一个队列 这边可以删掉,不去掉 这里会忽略创建
+        channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+        //TODO  绑定队列到交换机
+        channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, "");
+        channel.basicQos(1);//TODO 保证一次只分发一个
+        System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+        DefaultConsumer consumer = new DefaultConsumer(channel) {
+            //获取到达的消息
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
+                    throws IOException {
+                String message = new String(body, "UTF-8");
+                System.out.println(" [1] Received '" + message + "'");
+                try {
+                    Thread.sleep(1000);
+                } catch (Exception e) {
+                    e.printStackTrace(); } finally {
+                    System.out.println(" [x] Done"); }
+                channel.basicAck(envelope.getDeliveryTag(), false);//TODO 返回我处理完了
+            }
+        };
+        //监听队列
+        boolean autoAck = false; //TODO 手动确认消息(关闭true自动应答)
+        channel.basicConsume(QUEUE_NAME, autoAck, consumer);
+    }
+}
